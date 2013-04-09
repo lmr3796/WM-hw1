@@ -1,5 +1,6 @@
 #! /usr/bin/env bash
 
+tool_dir=tools
 relevance_feedback=false
 
 # Parse command line arguments
@@ -38,7 +39,7 @@ done
 #awk 'NF == 3{print NR " : " $0}' $inverted_index > `basename $inverted_index`.vocindex
 
 # Run
-./hw1.py $query_file $ranked_list $model_dir $vocab $file_list $inverted_index $ntcir_dir
+./hw1.py $query_file $ranked_list $model_dir $vocab $file_list $inverted_index $ntcir_dir $relevance_feedback $tool_dir
 
 
 

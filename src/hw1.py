@@ -5,14 +5,18 @@ import sys
 import subprocess
 import xml.etree.ElementTree as ElementTree
 
-class Config:
-    query_file = None
-    ranked_list = None
-    model_dir = None
-    vocab = None
-    file_list = None
-    inverted_index = None
-    ntcir_dir = None
+config = {
+        'query_file': None,
+        'ranked_list': None,
+        'model_dir': None,
+        'vocab': None,
+        'file_list': None,
+        'inverted_index': None,
+        'ntcir_dir': None,
+        'relevance_feedback': None,
+        'tool_dir': None
+        }
+
 class Query:
     def __init__(self, topic):
         self.title = topic.find('title').text
@@ -23,7 +27,7 @@ class Query:
 
 def process_query(query):
     for c in query.concepts:
-        print subprocess.check_output('echo %s | create-ngram -vocab %s -n %d' %
+        print subprocess.check_output('echo %s | tool_dir/create-ngram -vocab %s -n %d' %
                 [unicode(c).encode('utf8'),''], shell=True),
         return 0
     print '\n'
@@ -33,13 +37,15 @@ def process_query(query):
 def main():
     # process arguments
     (   
-        Config.query_file,
-        Config.ranked_list,
-        Config.model_dir,
-        Config.vocab,
-        Config.file_list,
-        Config.inverted_index,
-        Config.ntcir_dir
+        config['query_file'],
+        config['ranked_list'],
+        config['model_dir'],
+        config['vocab'],
+        config['file_list'],
+        config['inverted_index'],
+        config['ntcir_dir'],
+        config['relevance_feedback'],
+        config['tool_dir']
     ) = sys.argv[1:]
 
     # parse query file
