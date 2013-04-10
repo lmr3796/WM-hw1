@@ -1,2 +1,2 @@
 run:
-	./execute.sh -r -i query-file -o ranked-list -m model-dir -d NTCIR-dir
+	./execute.sh -r -i data/query-5.xml -o ranked-list -m data -d NTCIR-dir
