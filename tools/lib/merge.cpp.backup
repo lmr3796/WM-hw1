@@ -1,0 +1,108 @@
+#include <iostream>
+#include <map>
+#include <vector>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <queue>
+#include "merge.h"
+
+using namespace std;
+
+class Element
+{
+private:
+public:
+	string data;
+	int freq;
+	int from;
+
+	friend bool operator < (Element, Element);
+};
+
+bool operator < (Element a, Element b)
+{
+	return a.data > b.data;
+}
+
+void merge (vector <string> &files, string outfile)
+{
+	if (files.size()==0)
+		files.push_back (":STDIN");
+
+
+	FILE *fin[8192];
+	bool end[8192];
+	FILE *fout;
+	if (outfile=="-")
+		fout = stdout;
+	else
+		fout = fopen (outfile.c_str(), "w");
+
+
+	vector <string> buff = vector <string> (files.size());
+	vector <int> ans = vector <int> (files.size());
+	char buf[8192];
+
+	for (int i=0 ;i<files.size () ;i++)
+	{
+		if (files[i]==":STDIN")
+			fin[i] = stdin;
+		else
+			fin[i] = fopen (files[i].c_str(), "r");
+		end[i] = 0;
+	}
+
+
+	int end_file_num = 0;
+
+	for (int i=0 ;i<files.size() ;i++)
+	{
+		end[i] = (fscanf (fin[i], "%s %d", buf, &ans[i])!=2);
+		if (!end[i])
+			buff[i] = buf;
+		else
+			end_file_num++;
+	}
+
+	while (end_file_num < files.size())
+	{
+		string tmp = "";
+		int freq;
+
+		for (int i=0 ;i<files.size () ;i++)
+		{
+			if (end[i])
+				continue;
+
+			if (tmp=="" or tmp>buff[i])
+				tmp = buff[i];
+		}
+
+		freq = 0;
+		for (int i=0 ;i<files.size () ;i++)
+		{
+			if (end[i])
+				continue;
+
+			if (tmp==buff[i])
+			{
+				freq += ans[i];
+				end[i] = (fscanf (fin[i], "%s %d", buf, &ans[i])!=2);
+				if (!end[i])
+					buff[i] = buf;
+				else
+					end_file_num++;
+			}
+		}
+
+		fprintf (fout, "%s %d\n", tmp.c_str(), freq);
+	}
+
+
+	fclose (fout);
+
+	for (int i=0 ;i<files.size() ;i++)
+		fclose (fin[i]);
+}
+

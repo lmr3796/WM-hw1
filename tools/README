@@ -1,0 +1,5 @@
+compile:
+	just make
+
+run:
+	the executable will be located in [this dir]/bin/
