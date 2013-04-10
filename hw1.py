@@ -5,7 +5,7 @@ import sys
 import subprocess
 import xml.etree.ElementTree as ElementTree
 
-N_GRAM_CNT=2
+DEFAULT_N_GRAM_CNT=2
 
 config = {
         'query_file': None,
@@ -23,27 +23,27 @@ class Query:
     def __init__(self, topic):
         self.title = topic.find('title').text
         self.number = topic.find('number').text[-3:]
-        self.question = topic.find('question').text
-        self.narrative = topic.find('narrative').text
+        self.question = topic.find('question').text.strip()
+        self.narrative = topic.find('narrative').text.strip()
         self.concepts = topic.find('concepts').text.strip().replace(u'、', ' ').replace(u'。', ' ').split()
 
-def process_query(query):
-    create_ngram_cmd = '%s/create-ngram -vocab %s -n %d' % (config['tool_dir'], config['vocab'], N_GRAM_CNT)
-    raw_query_string = query.narrative #' '.join(query.concepts).encode('utf8')
-    print subprocess.check_output('echo \'%s\' | %s' % (raw_query_string, create_ngram_cmd), shell=True)
-    print '\n'
-    return 0
+def create_ngram(raw_query_string, n=DEFAULT_N_GRAM_CNT):
+    create_ngram_cmd = '%s/create-ngram -vocab %s -tmp . -n %d' % (config['tool_dir'], config['vocab'], n)
+    raw_result = subprocess.check_output('echo \'%s\' | %s' % (raw_query_string.encode('utf8'), create_ngram_cmd),
+            stderr=open('/dev/null', 'w'),
+            shell=True).splitlines()
+    return {line.split()[0]: line.split()[1] for line in raw_result}
 
+def process_query(query):
+    raw_query_string = query.question + query.narrative + ' '.join(query.concepts)
+    query_bigram = create_ngram(raw_query_string)
     return
 
 def create_vector():
     return 
 
 def read_inv_index(inv_idx):
-
     return
-
-
 
 def main():
     # process arguments

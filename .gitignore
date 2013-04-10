@@ -1,6 +1,7 @@
 data/
-tool/bin/*
+tools/bin/*
 *.swp
+*.tmp
 *.log
 *.py[cod]
 *.o

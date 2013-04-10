@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-tool_dir=tools
+tool_dir=tools/bin
 relevance_feedback=false
 
 # Parse command line arguments
