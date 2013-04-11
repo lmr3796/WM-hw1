@@ -36,7 +36,11 @@ do
 done
 
 # Generate index of the inverted index file
-#awk 'NF == 3{print NR " : " $0}' $inverted_index > `basename $inverted_index`.vocindex
+if [ ! -f `basename $inverted_index`.vocindex ]; then
+    echo -n 'Generating inverted index cache...'
+    awk 'NF == 3{print NR " " $0}' $inverted_index > `basename $inverted_index`.vocindex
+    echo 'done'
+fi
 
 # Run
 ./hw1.py $query_file $ranked_list $model_dir $vocab $file_list $inverted_index $ntcir_dir $relevance_feedback $tool_dir

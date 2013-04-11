@@ -3,5 +3,6 @@ tools/bin/*
 *.swp
 *.tmp
 *.log
+*.vocindex
 *.py[cod]
 *.o
