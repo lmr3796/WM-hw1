@@ -10,12 +10,14 @@ MAX_NGRAM = 2
 
 config = {}
 
-idf = lambda n: math.log10(n) - math.log10(config['doc_cnt'])
+idf = lambda n: config['doc_cnt_log'] - math.log10(n) 
+
 class InvertedIndex:
     def __init__(self, inv_idx):
         self.lines = inv_idx.readlines()
-        self.vocab = {'%s_%s' % (line.split()[0], line.split()[1]): (line_cnt, int(line.split()[2]))for line_cnt, line in enumerate(self.lines) if len(line.split()) == 3 }
-        
+        self.vocab = {'%s_%s' % (line.split()[0], line.split()[1]): {'range': (line_cnt, line_cnt + int(line.split()[2])),'idf': idf(int(line.split()[2])) }
+                for line_cnt, line in enumerate(self.lines) if len(line.split()) == 3 and int(line.split()[2]) > 0}
+
 
 class Query:
     def __init__(self, topic):
@@ -57,7 +59,8 @@ def main():
             config['relevance_feedback'],
             config['tool_dir']
             ) = sys.argv[1:]
-    print config['doc_cnt']
+    config['doc_cnt_log'] = math.log10(int(config['doc_cnt'])) # Preculate for speed up
+
     # read vocab
     with open(config['vocab']) as vocab_file:
         vocab = {word.strip(): line for line, word in enumerate(vocab_file.readlines())}
