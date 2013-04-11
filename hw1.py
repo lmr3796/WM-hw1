@@ -2,27 +2,19 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import math
 import subprocess
 import xml.etree.ElementTree as ElementTree
 
 MAX_NGRAM = 2
 
-config = {
-        'query_file': None,
-        'ranked_list': None,
-        'model_dir': None,
-        'vocab': None,
-        'file_list': None,
-        'inverted_index': None,
-        'ntcir_dir': None,
-        'relevance_feedback': None,
-        'tool_dir': None
-        }
+config = {}
 
+idf = lambda n: math.log10(n) - math.log10(config['doc_cnt'])
 class InvertedIndex:
     def __init__(self, inv_idx):
         self.lines = inv_idx.readlines()
-        self.vocab = {'%s_%s' % (line.split()[0], line.split()[1]): line_cnt for line_cnt, line in enumerate(self.lines)}
+        self.vocab = {'%s_%s' % (line.split()[0], line.split()[1]): (line_cnt, int(line.split()[2]))for line_cnt, line in enumerate(self.lines) if len(line.split()) == 3 }
         
 
 class Query:
@@ -40,10 +32,12 @@ def create_ngram(raw_query_string, n=MAX_NGRAM, raw=False):
             shell=True).splitlines()
     return raw_result if raw else {line.split()[0]: line.split()[1] for line in raw_result}
 
-def process_query(query):
+def similarity(query, doc_id):
+    return
+
+def process_query(query, index):
     raw_query_string = query.question + query.narrative + ' '.join(query.concepts)
     query_bigram = create_ngram(raw_query_string)
-    print query_bigram
     return
 
 def create_vector():
@@ -58,18 +52,19 @@ def main():
             config['vocab'],
             config['file_list'],
             config['inverted_index'],
+            config['doc_cnt'],
             config['ntcir_dir'],
             config['relevance_feedback'],
             config['tool_dir']
             ) = sys.argv[1:]
-
+    print config['doc_cnt']
     # read vocab
     with open(config['vocab']) as vocab_file:
         vocab = {word.strip(): line for line, word in enumerate(vocab_file.readlines())}
 
     # read inverted index
     with open(config['inverted_index']) as inv_idx:
-        a = InvertedIndex(inv_idx)
+        index = InvertedIndex(inv_idx)
 
     '''
     # parse query file
