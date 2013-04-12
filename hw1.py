@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
-import math
-import subprocess
+import sys, subprocess, math
 import xml.etree.ElementTree as ElementTree
+
+from collections import defaultdict
 
 MAX_NGRAM = 2
 MAX_DOC = 10
@@ -45,7 +45,7 @@ class QueryVector:
         return
 
 def process_query(query, index):
-    sim = {}
+    sim = defaultdict(float)
     qv = QueryVector(query, index)
     for bigram, query_bigram_score in qv.vector.iteritems():    # for each bigram
         if not index.vocab.has_key(bigram):
@@ -55,10 +55,7 @@ def process_query(query, index):
         for i in gram_index['range'][1:]:   # for each file with such bigram
             (doc_id, tf) = index.lines[i].split()
             tf = int(tf)
-            if not sim.has_key(doc_id):
-                sim[doc_id] = 0.0
-            else:
-                sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score
+            sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score
         
     return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1])[:MAX_DOC])
     
