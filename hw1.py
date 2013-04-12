@@ -37,7 +37,7 @@ class QueryVector:
         raw_result = subprocess.check_output('echo \'%s\' | %s' % (raw_query_string.encode('utf8'), create_ngram_cmd),
                 stderr=open('/dev/null', 'w'),
                 shell=True).splitlines()
-        return raw_result if raw else dict(map(str.split, raw_result))
+        return raw_result if raw else dict(map(lambda x: (x.split()[0], int(x.split()[1])), raw_result))
 
     def __init__(self, query, index):
         raw_query_string = query.question + query.narrative + ' '.join(query.concepts)
@@ -48,19 +48,17 @@ def process_query(query, index):
     sim = {}
     qv = QueryVector(query, index)
     for bigram, query_bigram_score in qv.vector.iteritems():    # for each bigram
+        if not index.vocab.has_key(bigram):
+            print >> sys.stderr, 'Bigram "%s" not found in vocabulary' % bigram
+            continue
         gram_index = index.vocab[bigram]
         for i in gram_index['range'][1:]:   # for each file with such bigram
-            try:
-                (doc_id, tf) = index.lines[i].split()
-            except ValueError:
-                print i, index.lines[i]
-                print gram_index['range']
-                raise
+            (doc_id, tf) = index.lines[i].split()
+            tf = int(tf)
             if not sim.has_key(doc_id):
                 sim[doc_id] = 0.0
             else:
-                # XXX: bigram has to be converted to tf
-                sim[doc_id] += tf * idf(bigram) * query_bigram_score
+                sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score
         
     return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1])[:MAX_DOC])
     
@@ -94,7 +92,6 @@ def main():
     query_list = [RawQuery(query) for query in root.findall('topic')]
     for query in query_list:
         print process_query(query, index)
-        return 0
 
     return 0
 
