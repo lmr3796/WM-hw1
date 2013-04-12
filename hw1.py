@@ -15,20 +15,25 @@ BASEFILE_NAME = {
         'inv_index':'inverted-index'
         }
 
-config = {}
+config = {} # Runtime environments
 vocab = {}
 
 idf = lambda n: config['doc_cnt_log'] - math.log10(n) 
 
 class InvertedIndex:
     def __init__(self, inv_idx):
+        # Load the lines of the inverted index files
         self.lines = inv_idx.readlines()
+
+        # Parse it into the form: bigram => {'range': line number of the bigram
+        #                                    'idf': idf of the bigram }
         self.vocab = {'%s_%s' % (line.split()[0], line.split()[1]): {'range': (line_cnt, line_cnt + int(line.split()[2])),'idf': idf(int(line.split()[2])) }
                 for line_cnt, line in enumerate(self.lines) if len(line.split()) == 3 and int(line.split()[2]) > 0}
         return
 
 class RawQuery:
     def __init__(self, topic):
+        # Extract contents from the element tree
         self.title = topic.find('title').text
         self.number = topic.find('number').text[-3:]
         self.question = topic.find('question').text.strip()
@@ -37,6 +42,7 @@ class RawQuery:
         return
 
 def create_ngram(raw_query_string, n=MAX_NGRAM, raw=False):
+    # invoke the `create-ngram` to get bigram TF
     CREATE_NGRAM_BIN = 'create-ngram'
     options = '-vocab %s -tmp . -n %d' % (config['vocab_file'], n)
     create_ngram_cmd = '%s/%s %s' % (config['tool_dir'], CREATE_NGRAM_BIN, options)
@@ -63,16 +69,17 @@ def convert_bigram_to_str(bigram):
     return '%s%s' % (vocab['line'][int(a)], vocab['line'][int(b)])
 
 def process_query(query, index):
-    sim = defaultdict(float)
+    sim = defaultdict(float)    # similarity to each document
     qv = convert_query_to_vector(query)
-    for bigram, query_bigram_score in qv.iteritems():    # for each bigram
+    for bigram, query_bigram_score in qv.iteritems():    # for each bigram in the query
         if not index.vocab.has_key(bigram):
+            # ignore the bigram if not found
             print >> sys.stderr, 'Bigram %s("%s") not found in vocabulary' % (bigram, convert_bigram_to_str(bigram))
             continue
-        for i in index.vocab[bigram]['range'][1:]:   # for each file with such bigram
+        for i in range(index.vocab[bigram]['range'][0]+1, index.vocab[bigram]['range'][1]):   # for each file with such bigram
             (doc_id, tf) = index.lines[i].split()
             tf = int(tf)
-            sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score
+            sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score # Sum up as dot product
 
     return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1], reverse=True)[:MAX_DOC_RETURN])
 
@@ -88,6 +95,7 @@ def main():
             ) = sys.argv[1:]
     config['doc_cnt_log'] = math.log10(int(config['doc_cnt'])) # Preculate for speed up
     config['vocab_file'] = config['model_dir'] + '/' +  BASEFILE_NAME['vocab']
+
     # Read model files
     with open('%s/%s' % (config['model_dir'], BASEFILE_NAME['file_list'])) as f:
         print >> sys.stderr, 'Reading file_list...',
@@ -107,7 +115,8 @@ def main():
     tree = ElementTree.parse(config['query_file'])
     root = tree.getroot()
     query_list = [RawQuery(query) for query in root.findall('topic')]
-    # ranked
+
+    # process queries and output to ranked_list
     with open(config['ranked_list'], 'w') as ranked_list:
         for query in query_list:
             print >> sys.stderr, 'Processing query %s...' % (query.number)
