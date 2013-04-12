@@ -62,7 +62,7 @@ def process_query(query, index):
             tf = int(tf)
             sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score
         
-    return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1])[:MAX_DOC_RETURN])
+    return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1], reverse=True)[:MAX_DOC_RETURN])
 
 def output(query, doc_ids, file_list, f):
     return
