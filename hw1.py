@@ -7,11 +7,16 @@ import xml.etree.ElementTree as ElementTree
 from collections import defaultdict
 
 MAX_NGRAM = 2
-MAX_DOC = 10
+MAX_DOC_RETURN = 10
+
+BASEFILE_NAME = {
+        'vocab':    'vocab.all',
+        'file_list':'file-list',
+        'inv_index':'inverted-index'
+        }
 
 config = {}
 
-output_file = sys.stdout
 idf = lambda n: config['doc_cnt_log'] - math.log10(n) 
 
 class InvertedIndex:
@@ -33,7 +38,7 @@ class RawQuery:
 class QueryVector:
     @staticmethod
     def create_ngram(raw_query_string, n=MAX_NGRAM, raw=False):
-        create_ngram_cmd = '%s/create-ngram -vocab %s -tmp . -n %d' % (config['tool_dir'], config['vocab'], n)
+        create_ngram_cmd = '%s/create-ngram -vocab %s -tmp . -n %d' % (config['tool_dir'], config['vocab_file'], n)
         raw_result = subprocess.check_output('echo \'%s\' | %s' % (raw_query_string.encode('utf8'), create_ngram_cmd),
                 stderr=open('/dev/null', 'w'),
                 shell=True).splitlines()
@@ -57,38 +62,49 @@ def process_query(query, index):
             tf = int(tf)
             sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score
         
-    return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1])[:MAX_DOC])
+    return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1])[:MAX_DOC_RETURN])
+
+def output(query, doc_ids, file_list, f):
+    return
     
 def main():
     # process arguments
     (config['query_file'],
             config['ranked_list'],
             config['model_dir'],
-            config['vocab'],
-            config['file_list'],
-            config['inverted_index'],
             config['doc_cnt'],
             config['ntcir_dir'],
             config['relevance_feedback'],
             config['tool_dir']
             ) = sys.argv[1:]
     config['doc_cnt_log'] = math.log10(int(config['doc_cnt'])) # Preculate for speed up
-    output_file = open(config['file_list'])
+    config['vocab_file'] = config['model_dir'] + '/' +  BASEFILE_NAME['vocab']
+    # Read model files
+    with open('%s/%s' % (config['model_dir'], BASEFILE_NAME['file_list'])) as f:
+        print >> sys.stderr, 'Reading file_list...',
+        file_list = map(str.strip, f.readlines())
+        print >> sys.stderr, 'done.'
 
-    # read vocab
-    with open(config['vocab']) as vocab_file:
-        vocab = {word.strip(): line for line, word in enumerate(vocab_file.readlines())}
-
-    # read inverted index
-    with open(config['inverted_index']) as inv_idx:
-        index = InvertedIndex(inv_idx)
+    with open('%s/%s' % (config['model_dir'], BASEFILE_NAME['inv_index'])) as f:
+        print >> sys.stderr, 'Processing inverted index, this should take few minutes...',
+        index = InvertedIndex(f)
+        print >> sys.stderr, 'done.'
+    #with open(config['model_dir'] + BASEFILE_NAME['vocab']) as f:
+    #    vocab = {word.strip(): line for line, word in enumerate(f.readlines())}
 
     # parse query file
     tree = ElementTree.parse(config['query_file'])
     root = tree.getroot()
     query_list = [RawQuery(query) for query in root.findall('topic')]
-    for query in query_list:
-        print process_query(query, index)
+    # ranked
+    with open(config['ranked_list'], 'w') as ranked_list:
+        for query in query_list:
+            doc_ids = process_query(query, index)
+            print >> sys.stderr, 'Processing query %s...' % (query.number),
+            for doc_id in doc_ids:
+                file_name = file_list[int(doc_id)]
+                print >> ranked_list, query.number, file_name[file_name.rfind('/')+1:].lower()
+            print >> sys.stderr, 'done, %d documents retrieved.' % (len(doc_ids))
 
     return 0
 

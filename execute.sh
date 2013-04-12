@@ -1,7 +1,6 @@
 #! /usr/bin/env bash
 
 tool_dir=tools/bin
-file_list=data/file-list
 relevance_feedback=false
 
 # Parse command line arguments
@@ -45,7 +44,7 @@ fi
 doc_cnt=`wc -l $file_list | awk '{print $1}'`
 
 # Run
-./hw1.py $query_file $ranked_list $model_dir $vocab $file_list $inverted_index $doc_cnt $ntcir_dir $relevance_feedback $tool_dir
+./hw1.py $query_file $ranked_list $model_dir $doc_cnt $ntcir_dir $relevance_feedback $tool_dir
 
 
 
