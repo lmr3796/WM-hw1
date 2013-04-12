@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ElementTree
 from collections import defaultdict
 
 MAX_NGRAM = 2
-MAX_DOC_RETURN = 10
+MAX_DOC_RETURN = 100
 
 BASEFILE_NAME = {
         'vocab':    'vocab.all',
@@ -64,9 +64,6 @@ def process_query(query, index):
         
     return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1], reverse=True)[:MAX_DOC_RETURN])
 
-def output(query, doc_ids, file_list, f):
-    return
-    
 def main():
     # process arguments
     (config['query_file'],
