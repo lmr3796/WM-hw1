@@ -16,7 +16,7 @@ BASEFILE_NAME = {
         }
 
 config = {} # Runtime environments
-vocab = {}  # Load vocabulary file
+vocab = {}
 
 idf = lambda n: config['doc_cnt_log'] - math.log10(n) 
 
@@ -62,7 +62,7 @@ def process_query(query, index):
             # ignore the bigram if not found
             print >> sys.stderr, 'Bigram %s("%s") not found in vocabulary' % (bigram, convert_bigram_to_str(bigram))
             continue
-        for i in index.vocab[bigram]['range'][1:]:   # for each file with such bigram
+        for i in range(index.vocab[bigram]['range'][0]+1, index.vocab[bigram]['range'][1]):   # for each file with such bigram
             (doc_id, tf) = index.lines[i].split()
             tf = int(tf)
             sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score # Sum up as dot product
