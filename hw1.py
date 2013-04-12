@@ -33,24 +33,38 @@ class RawQuery:
         self.number = topic.find('number').text[-3:]
         self.question = topic.find('question').text.strip()
         self.narrative = topic.find('narrative').text.strip()
-        self.concepts = topic.find('concepts').text.strip().replace(u'、', ' ').replace(u'。', ' ').split()
+        self.concepts = topic.find('concepts').text.strip().replace(u'、', '\n').replace(u'。', '\n').split()
         return
 
-def convert_bigram_to_str(bigram):
-    (a,b) = bigram.split('_')
-    return '%s%s' % (vocab['line'][int(a)], vocab['line'][int(b)])
-
 def create_ngram(raw_query_string, n=MAX_NGRAM, raw=False):
-    create_ngram_cmd = '%s/create-ngram -vocab %s -tmp . -n %d' % (config['tool_dir'], config['vocab_file'], n)
+    CREATE_NGRAM_BIN = 'create-ngram'
+    options = '-vocab %s -tmp . -n %d' % (config['vocab_file'], n)
+    create_ngram_cmd = '%s/%s %s' % (config['tool_dir'], CREATE_NGRAM_BIN, options)
     raw_result = subprocess.check_output('echo \'%s\' | %s' % (raw_query_string.encode('utf8'), create_ngram_cmd),
             stderr=open('/dev/null', 'w'),
             shell=True).splitlines()
     return raw_result if raw else dict(map(lambda x: (x.split()[0], int(x.split()[1])), raw_result))
 
+def convert_query_to_vector(query):
+    print >> sys.stderr, 'Converting query %s to vector form...' %(query.number),
+    vector = defaultdict(float)
+    for bigram, tf in create_ngram(query.question).iteritems():
+        vector[bigram] += tf
+    for bigram, tf in create_ngram(query.narrative).iteritems():
+        vector[bigram] += tf
+    for c in query.concepts:
+        for bigram, tf in create_ngram(c).iteritems():
+            vector[bigram] += tf
+    print >> sys.stderr, 'done.'
+    return vector
+
+def convert_bigram_to_str(bigram):
+    (a,b) = bigram.split('_')
+    return '%s%s' % (vocab['line'][int(a)], vocab['line'][int(b)])
+
 def process_query(query, index):
     sim = defaultdict(float)
-    raw_query_string = query.question + query.narrative + ' '.join(query.concepts)
-    qv = create_ngram(raw_query_string)
+    qv = convert_query_to_vector(query)
     for bigram, query_bigram_score in qv.iteritems():    # for each bigram
         if not index.vocab.has_key(bigram):
             print >> sys.stderr, 'Bigram %s("%s") not found in vocabulary' % (bigram, convert_bigram_to_str(bigram))
@@ -96,8 +110,8 @@ def main():
     # ranked
     with open(config['ranked_list'], 'w') as ranked_list:
         for query in query_list:
-            doc_ids = process_query(query, index)
             print >> sys.stderr, 'Processing query %s...' % (query.number)
+            doc_ids = process_query(query, index)
             for doc_id in doc_ids:
                 file_name = file_list[int(doc_id)]
                 print >> ranked_list, query.number, file_name[file_name.rfind('/')+1:].lower()
