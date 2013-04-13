@@ -23,9 +23,7 @@ do
             ;;
         "-m")
             model_dir=${para[$((i+1))]}
-            vocab=$model_dir/vocab.all
             file_list=$model_dir/file-list
-            inverted_index=$model_dir/inverted-index
             ;;
         "-d")
             ntcir_dir=${para[$((i+1))]}

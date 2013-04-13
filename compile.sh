@@ -1,2 +1,2 @@
 #! /usr/bin/env bash
-echo 'No compilation needed.'
+cd tools && make
