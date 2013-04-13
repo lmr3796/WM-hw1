@@ -2,6 +2,7 @@
 
 tool_dir=tools/bin
 relevance_feedback=false
+dr=20
 
 # Parse command line arguments
 if [ "$1" == "-r" ]; then
@@ -44,7 +45,7 @@ fi
 doc_cnt=`wc -l $file_list | awk '{print $1}'`
 
 # Run
-./hw1.py $query_file $ranked_list $model_dir $doc_cnt $ntcir_dir $relevance_feedback $tool_dir
+./hw1.py $query_file $ranked_list $model_dir $doc_cnt $ntcir_dir $relevance_feedback $dr $tool_dir
 
 
 

@@ -53,8 +53,13 @@ def create_ngram(raw_query_string, n=MAX_NGRAM, raw=False):
             shell=True).splitlines()
     return raw_result if raw else dict(map(lambda x: (x.split()[0], int(x.split()[1])), raw_result))
 
+def convert_bigram_to_str(bigram):
+    (a,b) = bigram.split('_')
+    return '%s%s' % (vocab['line'][int(a)], vocab['line'][int(b)])
+
 def process_query(query, index):
     sim = defaultdict(float)    # similarity to each document
+    doc_square_len = defaultdict(float) # square length of each document
     raw_query_string = query.question + query.narrative + ' '.join(query.concepts)
     qv = create_ngram(raw_query_string)
     for bigram, query_bigram_score in qv.iteritems():    # for each bigram in the query
@@ -62,10 +67,13 @@ def process_query(query, index):
             # ignore the bigram if not found
             print >> sys.stderr, 'Bigram %s("%s") not found in vocabulary' % (bigram, convert_bigram_to_str(bigram))
             continue
-        for i in range(index.vocab[bigram]['range'][0]+1, index.vocab[bigram]['range'][1]):   # for each file with such bigram
+        for i in range(index.vocab[bigram]['range'][0] + 1, index.vocab[bigram]['range'][1]):   # for each file with such bigram
             (doc_id, tf) = index.lines[i].split()
             tf = int(tf)
             sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score # Sum up as dot product
+
+    # cosine normalization
+    sim = dict(map(lambda x: (x[0], x[1]), sim.iteritems()))   # We don't need query vector length, it doesn't influence the order
 
     return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1], reverse=True)[:MAX_DOC_RETURN])
 
@@ -77,6 +85,7 @@ def main():
             config['doc_cnt'],
             config['ntcir_dir'],
             config['relevance_feedback'],
+            config['dr'],
             config['tool_dir']
             ) = sys.argv[1:]
     config['doc_cnt_log'] = math.log10(int(config['doc_cnt'])) # Preculate for speed up
