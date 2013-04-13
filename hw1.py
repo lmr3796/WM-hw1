@@ -20,6 +20,16 @@ vocab = {}
 
 idf = lambda n: config['doc_cnt_log'] - math.log10(n) 
 
+class RawQuery:
+    def __init__(self, topic):
+        # Extract contents from the element tree
+        self.title = topic.find('title').text
+        self.number = topic.find('number').text[-3:]
+        self.question = topic.find('question').text.strip()
+        self.narrative = topic.find('narrative').text.strip()
+        self.concepts = topic.find('concepts').text.strip().replace(u'、', ' ').replace(u'。', ' ').split()
+        return
+
 class InvertedIndex:
     def __init__(self, inv_idx):
         # Load the lines of the inverted index files
@@ -47,36 +57,34 @@ class InvertedIndex:
 
         return
 
-class RawQuery:
-    def __init__(self, topic):
-        # Extract contents from the element tree
-        self.title = topic.find('title').text
-        self.number = topic.find('number').text[-3:]
-        self.question = topic.find('question').text.strip()
-        self.narrative = topic.find('narrative').text.strip()
-        self.concepts = topic.find('concepts').text.strip().replace(u'、', ' ').replace(u'。', ' ').split()
-        return
-
 def convert_bigram_to_str(bigram):
     (a,b) = bigram.split('_')
     return '%s%s' % (vocab['line'][int(a)], vocab['line'][int(b)])
 
-def create_ngram(raw_query_string, n=MAX_NGRAM, raw=False):
+def create_ngram(raw_query_string, index, n=MAX_NGRAM, raw=False):
     # invoke the `create-ngram` to get bigram TF
     create_ngram_cmd = '%s/create-ngram -vocab %s -tmp . -n %d' % (config['tool_dir'], config['vocab_file'], n)
     raw_result = subprocess.check_output('echo \'%s\' | %s' % (raw_query_string.encode('utf8'), create_ngram_cmd),
             stderr=open('/dev/null', 'w'),
             shell=True).splitlines()
-    return raw_result if raw else dict(map(lambda x: (x.split()[0], int(x.split()[1])), raw_result))
+    return raw_result if raw else dict(map(lambda x: (x.split()[0], int(x.split()[1]) * idf(int(x.split()[1])) ), raw_result))
 
 def convert_bigram_to_str(bigram):
     (a,b) = bigram.split('_')
     return '%s%s' % (vocab['line'][int(a)], vocab['line'][int(b)])
 
-def process_query(query, index):
+def rocchio_feedback(qv, dr, index):
+    qm = defaultdict(float)
+    # linear combination
+    for bigram, score in qv.iteritems():
+        qm[bigram] += config['alpha'] * score
+    for doc_id in dr:
+        for bigram, score in index.doc[doc_id].iteritems():
+            qm[bigram] += config['beta'] * score / len(dr)
+    return process_query_vector(qm, index, False)
+
+def process_query_vector(qv, index, feedback, cos=True):
     doc_square_len = defaultdict(float) # square length of each document
-    raw_query_string = query.question + query.narrative + ' '.join(query.concepts)
-    qv = create_ngram(raw_query_string)
     sim = defaultdict(float)    # similarity of each document
     for bigram, query_bigram_score in qv.iteritems():    # for each bigram in the query
         if not index.bigram.has_key(bigram):
@@ -87,23 +95,41 @@ def process_query(query, index):
             sim[doc_id] += query_bigram_score * doc_bigram_score
 
     # cosine normalization
-    sim = dict(map(lambda x: (x[0], x[1] / index.doc_len[x[0]]), sim.iteritems()))   # We don't need query vector length, it doesn't influence the order
+    if cos:
+        sim = dict(map(lambda x: (x[0], x[1] / index.doc_len[x[0]]), sim.iteritems()))   # We don't need query vector length, it doesn't influence the order
 
-    return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1], reverse=True)[:MAX_DOC_RETURN])
+    best_doc = map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1], reverse=True)[:MAX_DOC_RETURN])
+    
+    if feedback:
+        best_doc = rocchio_feedback(qv, best_doc[:config['dr']], index)
+
+    return best_doc
+
+def process_query(query, index, feedback=False, cos=True):
+    raw_query_string = query.question + query.narrative + ' '.join(query.concepts)
+    qv = create_ngram(raw_query_string, index)
+    return process_query_vector(qv, index, feedback, cos)
+    
 
 def main():
     # process arguments
     (config['query_file'],
             config['ranked_list'],
+            config['tool_dir'],
             config['model_dir'],
             config['doc_cnt'],
             config['ntcir_dir'],
-            config['relevance_feedback'],
+            config['feedback'],
             config['dr'],
-            config['tool_dir']
+            config['alpha'],
+            config['beta'],
             ) = sys.argv[1:]
     config['doc_cnt_log'] = math.log10(int(config['doc_cnt'])) # Preculate for speed up
     config['vocab_file'] = config['model_dir'] + '/' +  BASEFILE_NAME['vocab']
+    config['feedback'] = config['feedback'] == 'true'
+    config['dr'] = int(config['dr'])
+    config['alpha'] = float(config['alpha'])
+    config['beta'] = float(config['beta'])
 
     # Read model files
     with open('%s/%s' % (config['model_dir'], BASEFILE_NAME['file_list'])) as f:
@@ -129,7 +155,7 @@ def main():
     with open(config['ranked_list'], 'w') as ranked_list:
         for query in query_list:
             print >> sys.stderr, 'Processing query %s...' % (query.number)
-            doc_ids = process_query(query, index)
+            doc_ids = process_query(query, index, feedback=config['feedback'])
             for doc_id in doc_ids:
                 file_name = file_list[int(doc_id)]
                 print >> ranked_list, query.number, file_name[file_name.rfind('/')+1:].lower()

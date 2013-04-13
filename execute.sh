@@ -2,7 +2,9 @@
 
 tool_dir=tools/bin
 relevance_feedback=false
-dr=20
+dr=10
+alpha='1.0'
+beta='0.75'
 
 # Parse command line arguments
 if [ "$1" == "-r" ]; then
@@ -35,17 +37,10 @@ do
 
     esac
 done
-
-# Generate index of the inverted index file
-if [ ! -f `basename $inverted_index`.vocindex ]; then
-    echo -n 'Generating inverted index cache...'
-    awk 'NF == 3{print NR " " $0}' $inverted_index > `basename $inverted_index`.vocindex
-    echo 'done'
-fi
 doc_cnt=`wc -l $file_list | awk '{print $1}'`
 
 # Run
-./hw1.py $query_file $ranked_list $model_dir $doc_cnt $ntcir_dir $relevance_feedback $dr $tool_dir
+./hw1.py $query_file $ranked_list $tool_dir $model_dir $doc_cnt $ntcir_dir $relevance_feedback $dr $alpha $beta
 
 
 
