@@ -23,12 +23,28 @@ idf = lambda n: config['doc_cnt_log'] - math.log10(n)
 class InvertedIndex:
     def __init__(self, inv_idx):
         # Load the lines of the inverted index files
-        self.lines = inv_idx.readlines()
+        self.lines = []
+        self.bigram = {}
+        self.doc = defaultdict(dict)
+        for line_number, line in enumerate(inv_idx.readlines()):
+            self.lines.append(line)
+            token = line.split()
+            # index for each bigram
+            if len(token) == 3:
+                if int(token[2]) <= 0:
+                    continue
+                bigram = '%s_%s' % (token[0], token[1])
+                bigram_idf = idf(int(token[2]))
+                self.bigram[bigram] = {'range': (line_number, line_number + int(token[2])), 'idf': bigram_idf, 'score_in_doc':{}}
+            else:
+                (doc_id, tf) = line.split()
+                tf = int(tf)
+                self.doc[doc_id][bigram] = tf * self.bigram[bigram]['idf']
+                self.bigram[bigram]['score_in_doc'][doc_id] = tf * self.bigram[bigram]['idf']
 
-        # Parse it into the form: bigram => {'range': line number of the bigram
-        #                                    'idf': idf of the bigram }
-        self.vocab = {'%s_%s' % (line.split()[0], line.split()[1]): {'range': (line_cnt, line_cnt + int(line.split()[2])),'idf': idf(int(line.split()[2])) }
-                for line_cnt, line in enumerate(self.lines) if len(line.split()) == 3 and int(line.split()[2]) > 0}
+        # Caculate document length
+        self.doc_len = {doc_id: reduce(lambda x, y: x + y ** 2, self.doc[doc_id].values()) ** 0.5 for doc_id in self.doc}
+
         return
 
 class RawQuery:
@@ -58,22 +74,20 @@ def convert_bigram_to_str(bigram):
     return '%s%s' % (vocab['line'][int(a)], vocab['line'][int(b)])
 
 def process_query(query, index):
-    sim = defaultdict(float)    # similarity to each document
     doc_square_len = defaultdict(float) # square length of each document
     raw_query_string = query.question + query.narrative + ' '.join(query.concepts)
     qv = create_ngram(raw_query_string)
+    sim = defaultdict(float)    # similarity of each document
     for bigram, query_bigram_score in qv.iteritems():    # for each bigram in the query
-        if not index.vocab.has_key(bigram):
+        if not index.bigram.has_key(bigram):
             # ignore the bigram if not found
             print >> sys.stderr, 'Bigram %s("%s") not found in vocabulary' % (bigram, convert_bigram_to_str(bigram))
             continue
-        for i in range(index.vocab[bigram]['range'][0] + 1, index.vocab[bigram]['range'][1]):   # for each file with such bigram
-            (doc_id, tf) = index.lines[i].split()
-            tf = int(tf)
-            sim[doc_id] += tf * index.vocab[bigram]['idf'] * query_bigram_score # Sum up as dot product
+        for doc_id, doc_bigram_score in index.bigram[bigram]['score_in_doc'].iteritems():
+            sim[doc_id] += query_bigram_score * doc_bigram_score
 
     # cosine normalization
-    sim = dict(map(lambda x: (x[0], x[1]), sim.iteritems()))   # We don't need query vector length, it doesn't influence the order
+    sim = dict(map(lambda x: (x[0], x[1] / index.doc_len[x[0]]), sim.iteritems()))   # We don't need query vector length, it doesn't influence the order
 
     return map(lambda x: x[0], sorted(sim.iteritems(), key=lambda x: x[1], reverse=True)[:MAX_DOC_RETURN])
 
@@ -114,8 +128,8 @@ def main():
     # process queries and output to ranked_list
     with open(config['ranked_list'], 'w') as ranked_list:
         for query in query_list:
-            doc_ids = process_query(query, index)
             print >> sys.stderr, 'Processing query %s...' % (query.number)
+            doc_ids = process_query(query, index)
             for doc_id in doc_ids:
                 file_name = file_list[int(doc_id)]
                 print >> ranked_list, query.number, file_name[file_name.rfind('/')+1:].lower()
